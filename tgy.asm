@@ -189,6 +189,8 @@
 .equ	EEPROM_SIGN	= 31337		; Random 16-bit value
 .equ	EEPROM_OFFSET	= 0x80		; Offset into 512-byte space (why not)
 
+.equ	SPI_DEFAULT_RET = 0x08	; default value we will return to master
+
 ;**** **** **** **** ****
 ; Register Definitions
 .def	temp5		= r0		; aux temporary (L) (limited operations)
@@ -301,6 +303,7 @@ neutral_l:	.byte	1	; Offset for neutral throttle (in CPU_MHZ)
 neutral_h:	.byte	1
 max_pwm:	.byte	1	; MaxPWM for MK (NOTE: 250 while stopped is magic and enables v2)
 motor_count:	.byte	1	; Motor number for serial control
+spi_ret_value:	.byte	1	; next value to be returned to SPI master
 ;**** **** **** **** ****
 ; The following entries are block-copied from/to EEPROM
 eeprom_sig_l:	.byte	1
@@ -353,7 +356,7 @@ eeprom_end:	.byte	1
 		reti		; t1ocb_int
 		rjmp t1ovfl_int	; t1ovfl_int
 		reti		; t0ovfl_int
-		reti		; spi_int
+		rjmp spi_stc_int	; spi_int
 		rjmp urxc_int	; urxc
 		reti		; udre
 		reti		; utxc
@@ -791,6 +794,25 @@ urxc_x3d_sync:	sbr	flags0, (1<<UART_SYNC)
 urxc_set_exit:	sts	motor_count, i_temp2
 urxc_exit:	out	SREG, i_sreg
 		reti
+	.endif
+;-----bko-----------------------------------------------------------------
+spi_stc_int:						; spi serial transmit complete interrupt
+	.if USE_SPI
+		in	i_sreg, SREG
+		;lds	i_temp1, spi_ret_value	; load next value to return to spi
+        lds	i_temp1, 0x08       	; load 0xFF to return to spi master
+		out SPDR, i_temp1			; send value out to parent
+		inc	i_temp1					; increment it for next time
+		sts	spi_ret_value, i_temp1	; save value back down to sram
+		out	SREG, i_sreg
+		reti
+spi_init:							; spi port directions are set-up elsewhere based on PORTB definitions in tgy.inc
+		;sbi	SPCR, SPE				; Enable SPI and SPI interrupt
+        ldi temp1, (1<<SPE) | (1<<SPIE)
+        out SPCR, temp1
+		ldi temp1, SPI_DEFAULT_RET	; initialise value to return to master
+		sts	spi_ret_value, i_temp1
+		ret
 	.endif
 ;-----bko-----------------------------------------------------------------
 ; beeper: timer0 is set to 1µs/count
@@ -1601,6 +1623,11 @@ control_start:
 		.if USE_INT0 || USE_ICP
 		rcp_int_rising_edge temp1
 		rcp_int_enable temp1
+		.endif
+
+	; init outputs (spi)
+		.if USE_SPI
+		rcall	spi_init
 		.endif
 
 		sei				; enable all interrupts

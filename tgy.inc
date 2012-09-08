@@ -12,6 +12,7 @@
 .equ	USE_I2C		= 0
 .equ	USE_UART	= 0
 .equ	USE_ICP		= 0
+.equ	USE_SPI 	= 1
 
 ;*********************
 ; PORT D definitions *
@@ -131,15 +132,15 @@
 ;*********************
 ;.equ			= 7
 ;.equ			= 6
-;.equ			= 5	(sck stk200 interface)
-;.equ			= 4	(miso stk200 interface)
-;.equ			= 3	(mosi stk200 interface)
-.equ	AnFET		= 2
+.equ	spi_sck	    = 5	;(sck stk200 interface)
+.equ	spi_miso	= 4	;(miso stk200 interface)
+.equ    spi_mosi    = 3	;(mosi stk200 interface)
+.equ	AnFET		= 2 ;(slave select - why spi won't work on this ESC)
 .equ	BnFET		= 1
 .equ	CnFET		= 0
 
-.equ	INIT_PB		= 0
-.equ	DIR_PB		= (1<<AnFET)+(1<<BnFET)+(1<<CnFET)
+.equ	INIT_PB		= (1<<spi_miso);0
+.equ	DIR_PB		= (1<<AnFET)+(1<<BnFET)+(1<<CnFET)+(1<<spi_miso)
 
 .equ	AnFET_port	= PORTB
 .equ	BnFET_port	= PORTB
